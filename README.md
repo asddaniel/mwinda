@@ -97,7 +97,7 @@ Suivez ces étapes pour faire fonctionner le projet sur votre machine locale.
 
 ### 1. Cloner le Projet
 
-```bash
+```
 git clone https://github.com/votre-repo/mwinda.git
 cd mwinda
 
@@ -105,7 +105,7 @@ cd mwinda
 
 Créez votre fichier d'environnement et configurez la base de données.
 
-```bash
+``` 
 # Copiez le fichier d'exemple
 cp .env.example .env
 
@@ -119,7 +119,7 @@ Ensuite, ouvrez le fichier .env et mettez à jour les informations de connexion 
 
 Installez les dépendances PHP (via Composer) et JavaScript (via npm).
 
-```bash
+``` 
 # Installer les paquets PHP
 composer install
 
@@ -130,7 +130,7 @@ npm install
 
 Exécutez les migrations pour créer la structure de la base de données et peuplez-la avec des données de test (un utilisateur de test avec plusieurs réservations).
 
-```bash
+``` 
 php artisan migrate:fresh --seed
 
 
@@ -142,13 +142,13 @@ Vous devez lancer deux serveurs en parallèle dans deux terminaux séparés.
 
 Terminal 1 : Serveur Vite (pour le frontend)
 
-```bash
+``` 
 npm run dev
 
 
 Terminal 2 : Serveur PHP (pour le backend)
 
-```bash
+``` 
 php artisan serve
 
 
