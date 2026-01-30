@@ -2,29 +2,41 @@ name: Deploy Laravel to Amazon Linux
 
 on:
   push:
-    branches: ["master"]
+    branches:
+      - master
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    - name: ConnexionSSHetdéploiement
-      uses: appleboy/ssh-action@v1.0.0
-      env:
-        SSH_PRIVATE_KEY: ${{ secrets.SSH_KEY }}
-      with:
-        host: ${{ secrets.HOST }}
-        username: ${{ secrets.USERNAME }}
-        key: ${{ env.SSH_PRIVATE_KEY }}
-        script: |
-          cd /usr/share/nginx/html/mwinda
-          git fetch origin master
-          git reset --hard origin/master
-          php artisan migrate --force
-          php artisan config:cache
-          php artisan route:cache
-          php artisan view:cache
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          port: 22
+          timeout: 600
+          script: |
+            set -e
 
-        
+            # go to project dir (fail if it doesn't exist)
+            cd /usr/share/nginx/html/mwinda || { echo "Deployment directory not found"; exit 1; }
+
+            # Ensure we have the latest code from the remote
+            git fetch --all --prune
+            git reset --hard origin/master
+            git clean -fd
+
+            # Install PHP dependencies (ensure composer is available on the server)
+            composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction --no-progress
+
+            # Run database migrations and cache optimizations
+            php artisan migrate --force
+            php artisan config:cache
+            php artisan route:cache
+            php artisan view:cache
