@@ -15,53 +15,61 @@ jobs:
 
       - name: Deploy Application via SSH
         env:
-          # On charge la clé encodée en Base64 depuis les secrets
-          SSH_KEY_BASE64: ${{ secrets.SSH_KEY }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_KEY }}
           HOST: ${{ secrets.HOST }}
           USER: ${{ secrets.USERNAME }}
         run: |
-          # --- 1. PRÉPARATION DU CLIENT SSH (Sur le Runner GitHub) ---
           mkdir -p ~/.ssh/
           
-          # Décodage de la clé : Base64 -> Fichier original
-          echo "$SSH_KEY_BASE64" | base64 -d > ~/.ssh/id_rsa
+          # 1. Écriture de la clé dans un fichier temporaire
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
           
-          # Permissions strictes obligatoires (sinon SSH refuse la clé)
+          # -----------------------------------------------------------
+          # CORRECTION AUTOMATIQUE DU FORMAT (Windows -> Linux)
+          # -----------------------------------------------------------
+          # Supprime les retours chariot (\r) qui corrompent la clé sous Linux
+          tr -d '\r' < ~/.ssh/id_rsa > ~/.ssh/id_rsa.clean
+          mv ~/.ssh/id_rsa.clean ~/.ssh/id_rsa
+          
+          # Ajoute un saut de ligne final de sécurité (requis par OpenSSH)
+          echo "" >> ~/.ssh/id_rsa
+          # -----------------------------------------------------------
+
+          # 2. Permissions strictes obligatoires
           chmod 600 ~/.ssh/id_rsa
-          
-          # Ajout du serveur aux hôtes connus pour éviter le prompt "Yes/No"
+
+          # 3. Ajout du serveur aux hôtes connus pour éviter le blocage "Host unknown"
           ssh-keyscan -H $HOST >> ~/.ssh/known_hosts
 
-          # --- 2. CONNEXION ET EXÉCUTION (Sur le Serveur Amazon) ---
-          echo "Connexion SSH en cours..."
+          # 4. Connexion et exécution des commandes Laravel
+          echo "Démarrage de la connexion SSH..."
           
-          # La syntaxe "<< 'EOF'" permet d'envoyer tout le bloc suivant au serveur
           ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no $USER@$HOST "bash -s" << 'EOF'
-            
-            # --- DÉBUT DU SCRIPT DISTANT ---
             
             # Arrêter le script immédiatement si une commande échoue
             set -e
             
-            echo "✅ Connecté au serveur. Navigation vers le dossier..."
+            echo "✅ Connexion réussie sur le serveur !"
+            
+            # Navigation vers le dossier
             cd /usr/share/nginx/html/mwinda || { echo "❌ Dossier introuvable"; exit 1; }
 
-            echo "📥 Récupération du code Git..."
+            # Mise à jour du code
+            echo "📥 Récupération du code..."
             git fetch --all --prune
             git reset --hard origin/master
             git clean -fd
 
-            echo "📦 Installation des dépendances Composer..."
-            # Assure-toi que 'composer' est dans le PATH, sinon utilise le chemin complet (ex: /usr/local/bin/composer)
+            # Installation des dépendances
+            echo "📦 Installation Composer..."
             composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction --no-progress
 
-            echo "🚀 Exécution des commandes Laravel..."
+            # Commandes Laravel
+            echo "🚀 Optimisations Laravel..."
             php artisan migrate --force
             php artisan config:cache
             php artisan route:cache
             php artisan view:cache
             
-            echo "🎉 DÉPLOIEMENT TERMINÉ AVEC SUCCÈS !"
-            
-            # --- FIN DU SCRIPT DISTANT ---
+            echo "🎉 Déploiement terminé avec succès."
           EOF
