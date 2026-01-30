@@ -12,7 +12,19 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        
+      - name: Debug SSH Key (Safe)
+        env:
+          MY_KEY: ${{ secrets.SSH_KEY }}
+        run: |
+          if [ -z "$MY_KEY" ]; then
+            echo "ERREUR FATALE: La variable secret est VIDE."
+            exit 1
+          else
+            echo "Succès: La variable contient des données."
+            echo "Longueur de la clé: ${#MY_KEY} caractères."
+            # Affiche la première ligne pour voir si c'est bien une clé RSA/OPENSSH
+            echo "En-tête: $(echo "$MY_KEY" | head -n 1)"
+          fi
       - name: Deploy via SSH
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_KEY }}
