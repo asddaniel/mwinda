@@ -9,6 +9,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Debug key format
+        run: |
+          echo "${{ secrets.SSH_KEY }}" | head -n 2
+
       - name: Connexion SSH et déploiement
         uses: appleboy/ssh-action@master
         with:
