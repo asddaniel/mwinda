@@ -19,7 +19,7 @@ jobs:
             cd /usr/share/nginx/html/mwinda
             
             # Forcer Git à ignorer les changements locaux s'il y en a et récupérer le code
-            git fetch origin main
+            git fetch origin master
             git reset --hard origin/master
             
             # Installation des dépendances 
