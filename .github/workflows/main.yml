@@ -10,66 +10,58 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Test Connection Manuelle SSH
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy Application via SSH
         env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_KEY }}
+          # On charge la clé encodée en Base64 depuis les secrets
+          SSH_KEY_BASE64: ${{ secrets.SSH_KEY }}
           HOST: ${{ secrets.HOST }}
           USER: ${{ secrets.USERNAME }}
         run: |
-          # 1. Créer le dossier .ssh
+          # --- 1. PRÉPARATION DU CLIENT SSH (Sur le Runner GitHub) ---
           mkdir -p ~/.ssh/
           
-          # 2. Écrire la clé dans un fichier (C'est là qu'on voit si le format casse)
-          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          # Décodage de la clé : Base64 -> Fichier original
+          echo "$SSH_KEY_BASE64" | base64 -d > ~/.ssh/id_rsa
+          
+          # Permissions strictes obligatoires (sinon SSH refuse la clé)
           chmod 600 ~/.ssh/id_rsa
           
-          # 3. Ajouter le serveur aux known_hosts pour éviter le prompt interactif
+          # Ajout du serveur aux hôtes connus pour éviter le prompt "Yes/No"
           ssh-keyscan -H $HOST >> ~/.ssh/known_hosts
-          
-          # 4. Tenter la connexion en mode VERBEUX (C'est ça qu'on veut voir)
-          echo "Tentative de connexion..."
-          ssh -vvv -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no $USER@$HOST "echo 'CONNEXION REUSSIE !'"
-      - name: Debug SSH Key (Safe)
-        env:
-          MY_KEY: ${{ secrets.SSH_KEY }}
-          
-        run: |
-          if [ -z "$MY_KEY" ]; then
-            echo "ERREUR FATALE: La variable secret est VIDE."
-            exit 1
-          else
-            echo "Succès: La variable contient des données."
-            echo "Longueur de la clé: ${#MY_KEY} caractères."
-            
-            # Affiche la première ligne pour voir si c'est bien une clé RSA/OPENSSH
-            echo "En-tête: $(echo "$MY_KEY" | head -n 1)"
-          fi
-      - name: Deploy via SSH
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_KEY }}
-        uses: appleboy/ssh-action@v0.1.7
-        with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
-          key: $SSH_PRIVATE_KEY
-          port: 22
-          timeout: 600s
-          script: |
-            set -e
-            echo $SSH_PRIVATE_KEY
-            # go to project dir (fail if it doesn't exist)
-            cd /usr/share/nginx/html/mwinda || { echo "Deployment directory not found"; exit 1; }
 
-            # Ensure we have the latest code from the remote
+          # --- 2. CONNEXION ET EXÉCUTION (Sur le Serveur Amazon) ---
+          echo "Connexion SSH en cours..."
+          
+          # La syntaxe "<< 'EOF'" permet d'envoyer tout le bloc suivant au serveur
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no $USER@$HOST "bash -s" << 'EOF'
+            
+            # --- DÉBUT DU SCRIPT DISTANT ---
+            
+            # Arrêter le script immédiatement si une commande échoue
+            set -e
+            
+            echo "✅ Connecté au serveur. Navigation vers le dossier..."
+            cd /usr/share/nginx/html/mwinda || { echo "❌ Dossier introuvable"; exit 1; }
+
+            echo "📥 Récupération du code Git..."
             git fetch --all --prune
             git reset --hard origin/master
             git clean -fd
 
-            # Install PHP dependencies (ensure composer is available on the server)
+            echo "📦 Installation des dépendances Composer..."
+            # Assure-toi que 'composer' est dans le PATH, sinon utilise le chemin complet (ex: /usr/local/bin/composer)
             composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction --no-progress
 
-            # Run database migrations and cache optimizations
+            echo "🚀 Exécution des commandes Laravel..."
             php artisan migrate --force
             php artisan config:cache
             php artisan route:cache
             php artisan view:cache
+            
+            echo "🎉 DÉPLOIEMENT TERMINÉ AVEC SUCCÈS !"
+            
+            # --- FIN DU SCRIPT DISTANT ---
+          EOF
