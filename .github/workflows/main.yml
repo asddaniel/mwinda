@@ -7,69 +7,56 @@ on:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    # CHANGEMENT 1 : On force une version d'Ubuntu plus ancienne et stable
+    # Cela évite les problèmes de compatibilité OpenSSL 3.0 des versions récentes
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy Application via SSH
+      # CHANGEMENT 2 : On utilise un spécialiste pour charger la clé
+      # Cette action charge la clé directement en mémoire (RAM) de l'agent SSH.
+      # Elle gère elle-même les problèmes de formatage Windows/Linux.
+      - name: Setup SSH Agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_KEY }}
+
+      - name: Deploy Application
         env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_KEY }}
           HOST: ${{ secrets.HOST }}
           USER: ${{ secrets.USERNAME }}
         run: |
-          mkdir -p ~/.ssh/
+          # Plus besoin de créer de fichier id_rsa, l'agent s'en occupe.
           
-          # 1. Écriture de la clé dans un fichier temporaire
-          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
-          
-          # -----------------------------------------------------------
-          # CORRECTION AUTOMATIQUE DU FORMAT (Windows -> Linux)
-          # -----------------------------------------------------------
-          # Supprime les retours chariot (\r) qui corrompent la clé sous Linux
-          tr -d '\r' < ~/.ssh/id_rsa > ~/.ssh/id_rsa.clean
-          mv ~/.ssh/id_rsa.clean ~/.ssh/id_rsa
-          
-          # Ajoute un saut de ligne final de sécurité (requis par OpenSSH)
-          echo "" >> ~/.ssh/id_rsa
-          # -----------------------------------------------------------
-
-          # 2. Permissions strictes obligatoires
-          chmod 600 ~/.ssh/id_rsa
-
-          # 3. Ajout du serveur aux hôtes connus pour éviter le blocage "Host unknown"
+          # On ajoute juste le serveur aux connus pour éviter la question "Are you sure?"
+          mkdir -p ~/.ssh
           ssh-keyscan -H $HOST >> ~/.ssh/known_hosts
 
-          # 4. Connexion et exécution des commandes Laravel
-          echo "Démarrage de la connexion SSH..."
+          echo "🚀 Tentative de connexion via l'agent SSH..."
           
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no $USER@$HOST "bash -s" << 'EOF'
+          # Note l'option -A (Forward Agent) qui utilise la clé chargée en mémoire
+          ssh -o StrictHostKeyChecking=no -A $USER@$HOST "bash -s" << 'EOF'
             
-            # Arrêter le script immédiatement si une commande échoue
             set -e
+            echo "✅ CONNEXION RÉUSSIE !"
             
-            echo "✅ Connexion réussie sur le serveur !"
+            # Tes commandes habituelles
+            cd /usr/share/nginx/html/mwinda || exit 1
             
-            # Navigation vers le dossier
-            cd /usr/share/nginx/html/mwinda || { echo "❌ Dossier introuvable"; exit 1; }
-
-            # Mise à jour du code
-            echo "📥 Récupération du code..."
+            echo "📥 Git Pull..."
             git fetch --all --prune
             git reset --hard origin/master
-            git clean -fd
-
-            # Installation des dépendances
-            echo "📦 Installation Composer..."
+            
+            echo "📦 Composer..."
             composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction --no-progress
-
-            # Commandes Laravel
-            echo "🚀 Optimisations Laravel..."
+            
+            echo "🔧 Artisan..."
             php artisan migrate --force
             php artisan config:cache
             php artisan route:cache
             php artisan view:cache
             
-            echo "🎉 Déploiement terminé avec succès."
+            echo "🎉 Terminé."
           EOF
