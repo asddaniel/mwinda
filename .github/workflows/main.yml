@@ -10,21 +10,21 @@ jobs:
 
     steps:
 
-     - name: SetupSSH
-      run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_KEY }}" | tr -d '\r' > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.HOST }} >> ~/.ssh/known_hosts
+    - name: ConnexionSSHetdéploiement
+      uses: appleboy/ssh-action@v1.0.0
+    env:
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_KEY }}
+    with:
+      host: ${{ secrets.HOST }}
+      username: ${{ secrets.USERNAME }}
+      key: ${{ env.SSH_PRIVATE_KEY }}
+      script: |
+        cd /usr/share/nginx/html/mwinda
+        git fetch origin master
+        git reset --hard origin/master
+        php artisan migrate --force
+        php artisan config:cache
+        php artisan route:cache
+      php artisan view:cache
 
-     - name: Deploy
-       run: |
-          ssh ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
-            cd /usr/share/nginx/html/mwinda
-            git fetch origin master
-            git reset --hard origin/master
-            php artisan migrate --force
-            php artisan config:cache
-            php artisan route:cache
-            php artisan view:cache
           EOF
