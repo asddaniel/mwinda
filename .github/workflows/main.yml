@@ -9,28 +9,25 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Debug key format
+
+      - name: Write SSH key
         run: |
-          echo "${{ secrets.SSH_KEY }}" | head -n 2
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_KEY }}" | tr -d '\r' > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
 
       - name: Connexion SSH et déploiement
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USERNAME }}
-          key: ${{ secrets.SSH_KEY }}
+          key_path: ~/.ssh/id_rsa
           script: |
             cd /usr/share/nginx/html/mwinda
-            
-            # Forcer Git à ignorer les changements locaux s'il y en a et récupérer le code
             git fetch origin master
             git reset --hard origin/master
-            
-            # Installation des dépendances 
-            # composer install --no-dev --optimize-autoloader
-            
-            # Mise à jour de Laravel
             php artisan migrate --force
             php artisan config:cache
             php artisan route:cache
             php artisan view:cache
+
