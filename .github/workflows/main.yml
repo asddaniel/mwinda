@@ -10,19 +10,16 @@ jobs:
 
     steps:
 
-      - name: Write SSH key
-        run: |
-          mkdir -p /home/runner/.ssh
-          echo "${{ secrets.SSH_KEY }}" | tr -d '\r' > /home/runner/.ssh/id_rsa
-          chmod 600 /home/runner/.ssh/id_rsa
+     - name: SetupSSH
+      run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_KEY }}" | tr -d '\r' > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.HOST }} >> ~/.ssh/known_hosts
 
-      - name: Connexion SSH et déploiement
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
-          key_path: /home/runner/.ssh/id_rsa
-          script: |
+     - name: Deploy
+       run: |
+          ssh ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
             cd /usr/share/nginx/html/mwinda
             git fetch origin master
             git reset --hard origin/master
@@ -30,3 +27,4 @@ jobs:
             php artisan config:cache
             php artisan route:cache
             php artisan view:cache
+          EOF
