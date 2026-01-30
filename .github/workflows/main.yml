@@ -2,30 +2,30 @@ name: Deploy Laravel to Amazon Linux
 
 on:
   push:
-    branches: [ "master" ] # Déclenche le déploiement lors d'un push sur main
+    branches: ["master"]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
+
+      - name: Write SSH key
+        run: |
+          mkdir -p /home/runner/.ssh
+          echo "${{ secrets.SSH_KEY }}" | tr -d '\r' > /home/runner/.ssh/id_rsa
+          chmod 600 /home/runner/.ssh/id_rsa
+
       - name: Connexion SSH et déploiement
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USERNAME }}
-          key: ${{ env.SSH_KEY }}
+          key_path: /home/runner/.ssh/id_rsa
           script: |
             cd /usr/share/nginx/html/mwinda
-            
-            # Forcer Git à ignorer les changements locaux s'il y en a et récupérer le code
             git fetch origin master
             git reset --hard origin/master
-            
-            # Installation des dépendances (optionnel si déjà fait, mais sécurisant)
-            # composer install --no-dev --optimize-autoloader
-            
-            # Mise à jour de Laravel
             php artisan migrate --force
             php artisan config:cache
             php artisan route:cache
