@@ -2,61 +2,31 @@ name: Deploy Laravel to Amazon Linux
 
 on:
   push:
-    branches:
-      - master
+    branches: [ "master" ] # Déclenche le déploiement lors d'un push sur main
 
 jobs:
   deploy:
-    # CHANGEMENT 1 : On force une version d'Ubuntu plus ancienne et stable
-    # Cela évite les problèmes de compatibilité OpenSSL 3.0 des versions récentes
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      # CHANGEMENT 2 : On utilise un spécialiste pour charger la clé
-      # Cette action charge la clé directement en mémoire (RAM) de l'agent SSH.
-      # Elle gère elle-même les problèmes de formatage Windows/Linux.
-      - name: Setup SSH Agent
-        uses: webfactory/ssh-agent@v0.9.0
+      - name: Connexion SSH et déploiement
+        uses: appleboy/ssh-action@master
         with:
-          ssh-private-key: ${{ secrets.SSH_KEY }}
-
-      - name: Deploy Application
-        env:
-          HOST: ${{ secrets.HOST }}
-          USER: ${{ secrets.USERNAME }}
-        run: |
-          # Plus besoin de créer de fichier id_rsa, l'agent s'en occupe.
-          
-          # On ajoute juste le serveur aux connus pour éviter la question "Are you sure?"
-          mkdir -p ~/.ssh
-          ssh-keyscan -H $HOST >> ~/.ssh/known_hosts
-
-          echo "🚀 Tentative de connexion via l'agent SSH..."
-          
-          # Note l'option -A (Forward Agent) qui utilise la clé chargée en mémoire
-          ssh -o StrictHostKeyChecking=no -A $USER@$HOST "bash -s" << 'EOF'
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            cd /usr/share/nginx/html/mwinda
             
-            set -e
-            echo "✅ CONNEXION RÉUSSIE !"
+            # Forcer Git à ignorer les changements locaux s'il y en a et récupérer le code
+            git fetch origin main
+            git reset --hard origin/main
             
-            # Tes commandes habituelles
-            cd /usr/share/nginx/html/mwinda || exit 1
+            # Installation des dépendances 
+            # composer install --no-dev --optimize-autoloader
             
-            echo "📥 Git Pull..."
-            git fetch --all --prune
-            git reset --hard origin/master
-            
-            echo "📦 Composer..."
-            composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction --no-progress
-            
-            echo "🔧 Artisan..."
+            # Mise à jour de Laravel
             php artisan migrate --force
             php artisan config:cache
             php artisan route:cache
             php artisan view:cache
-            
-            echo "🎉 Terminé."
-          EOF
