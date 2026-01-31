@@ -1,54 +1,33 @@
-name: Deploy Laravel to Amazon Linux
+name: Deploy Laravel to Ubuntu
 
 on:
   push:
-    branches: [ "master" ] # Déclenche le déploiement lors d'un push sur main
+    branches: [ "master" ]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Connexion SSH et déploiement
-        uses: appleboy/ssh-action@master
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configuration de SSH Agent
+        uses: webfactory/ssh-agent@v0.9.0
         with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
-          key: "-----BEGIN RSA PRIVATE KEY-----
-MIIEogIBAAKCAQEArmMzvnqI3X7oUukf31lA73fnBCV3Q+RMzBpfwVoo3gB+N16y
-vTdm8Rg1Hewwm4v8qOZx+NW8JvyzJibDjZGBKU11dsY2lpUeRU7EmpBGJtJ2wBU8
-eMwxuPjqGf7aanstGAFQMCDZ0XJppI1BfsBI39/oo54os5wpft4IijHzdvdHjzyn
-Tu2xXJM/wDPv3obo+MhBaVAv22QltWmfLHOdn3WVm4T2iryITpEKrlWul+vyuaj3
-EetlAspbwD76QpF20DNcUUK3uMpyAF00Hcv0d7dBDUjGnyUdyi/+x8LjWT4MYSZu
-skeDbhmCtB7IWaNVnQ1cBgXROMX6cdEqd6+JYQIDAQABAoIBAB6ca0jUWZIH5OAo
-699Y230tnu+rY/QW7yQkvQpDuUi+7WjqxpVQVFGd3jUScLXdLMy5Juh3HD/7u7bG
-tyzyjamiXywqPwrPwjCIUxqOmMHXz+CH2cWakl/V0cIealimppPAJ0NLgPCzFLg9
-03Fcb25c74lJCfv9PYt3jigz/Hi1RQWXuF3cBltT4FEwMEg3a/m2hcLVkwjycrxG
-7HNY9jJjLwcGxOx96LaTABglR2FW58e9Rw9I/qVpKVWb/LE8+X7ogASJGzNpLWhM
-YSW8BKZYme9/C9rhfeizaEuCspk5bqDcI4zsZ5aUqcKRB70SDCft7FEf0KQCCEN0
-rLd+IsECgYEA5Ab5qadM+2qFSUwZIilrczs/YIxrE60hQROhHX93RHHhwl6j7vd8
-Ov52lU/AQfS+enGm1DEUVIQyqE55hXscWTT74E19odMnKs5Ka6d4Hvp7EvaTHF/v
-5aKcNk9uLVBtBtcLmGTyCcijrCfZBuqDzBWp3qSrBEZCqBUfQVz4CWGHWF91iaEw
-Clky9Bc2SxSsCgyGLoFOf3P2yC+QQIVwuVjWZQf7wqHeRXSRXZdopB67LRz8IcqQ
-8GVKHVkImMSc0LOo3C9KBd8/7b2pqzZ79rOhk+xiRWhmubEz9KJioEKtxALaGqxm
-7wYfWc0DG7hSqOYWqGcFfxugSScv0MDsYbNnI7sCgYB/5QGnDDT7VtWHNO1r4bto
-mDSF3Hw6PwLF01Ksjs/ATfeH4zkjUSAWnp64RFDbLYCggJpHrXdvp+4ZxFoYaeKO
-jk8vkYcDesEfGzFWjEmtZmQdULtWUODm9XuUYpyzQcbE7VyNjyEirIT6FDMLysVh
-2qHsE8waNSc8Fbbqm5DNjQKBgEIeT09dYoTm1fIzUAqwwhwwlUcb7csbrRbtOe2O
-oBFMyeyoZ/2C6Zj3CmLq8gHBWTE8TQiy3H3e1LVrKR6enjeGTPSAugFbXVKyOtlN
-PxNK8MFKCe9KdiZ3NOG0wySAZhI+CSFOKwZT42nYLSpXUm2bJVMRDGfIMTDKBsrU
-INADAoGASChVpA77XcIADP/KjuxHJdTKlR3K/miNM5ZKh88gyA6I2IWkWHwGX9Ky
-riCajG9HiK/7ZLLkdS0ocjsM2MJdYyvVdajn7qGTosv9XR0mCNKL9ccPhG/5q3nN
-7bGfqikrnr/DGHznAuJiukWc8GAH5k1HoqDWjUkryiV5Jb9GHt0=
------END RSA PRIVATE KEY-----"
-          script: |
+          ssh-private-key: ${{ secrets.SSH_KEY }}
+
+      - name: Déploiement via SSH
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
+            set -e
             cd /usr/share/nginx/html/mwinda
             
-            # Forcer Git à ignorer les changements locaux s'il y en a et récupérer le code
-            git fetch origin main
-            git reset --hard origin/main
+            # Mise à jour du code
+            git fetch origin master
+            git reset --hard origin/master
             
-            # Installation des dépendances 
+            # Installation des dépendances (si nécessaire)
             # composer install --no-dev --optimize-autoloader
             
             # Mise à jour de Laravel
@@ -56,3 +35,7 @@ riCajG9HiK/7ZLLkdS0ocjsM2MJdYyvVdajn7qGTosv9XR0mCNKL9ccPhG/5q3nN
             php artisan config:cache
             php artisan route:cache
             php artisan view:cache
+            
+            # Nettoyage des permissions (Optionnel mais recommandé sur Ubuntu)
+            # sudo chown -R www-data:www-data storage bootstrap/cache
+          EOF
