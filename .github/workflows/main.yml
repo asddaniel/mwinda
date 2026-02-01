@@ -12,14 +12,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Configuration de SSH Agent
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.SSH_KEY }}
+      # CORRECTION ICI : On n'utilise plus ssh-agent.
+      # On crée le fichier .pem manuellement comme indiqué par AWS.
+      - name: Création du fichier de clé SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
 
       - name: Déploiement via SSH
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
+          # On utilise l'option -i comme sur ton PC local
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
             set -e
             cd /usr/share/nginx/html/mwinda
             
@@ -27,15 +31,9 @@ jobs:
             git fetch origin master
             git reset --hard origin/master
             
-            # Installation des dépendances (si nécessaire)
-            # composer install --no-dev --optimize-autoloader
-            
-            # Mise à jour de Laravel
+            # Commandes Laravel
             php artisan migrate --force
             php artisan config:cache
             php artisan route:cache
             php artisan view:cache
-            
-            # Nettoyage des permissions (Optionnel mais recommandé sur Ubuntu)
-            # sudo chown -R www-data:www-data storage bootstrap/cache
           EOF
