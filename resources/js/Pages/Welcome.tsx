@@ -28,7 +28,7 @@ export default function Welcome({ auth, laravelVersion, phpVersion }: PageProps<
                             {/* Logo */}
                             <div className="flex-shrink-0">
                                 <Link href="/" className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-purple-600">
-                                    MwindaUpda
+                                    Mwinda 
                                 </Link>
                             </div>
                             {/* Navigation Links */}
